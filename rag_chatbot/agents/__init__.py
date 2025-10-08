@@ -8,6 +8,11 @@ from .qa_agent import (
 from .query_agent import RAGQueryAgentInputSchema, RAGQueryAgentOutputSchema, query_agent
 from .stt_agent import SpeechToTextInputSchema, SpeechToTextOutputSchema, SpeechToTextAgent, stt_config
 from .tasking_agent import TaskingInputSchema, TaskingOutputSchema, tasking_agent
+from .orchestrator_agent import (
+    OrchestratorInputSchema,
+    OrchestratorOutputSchema,
+    orchestrator_agent,
+)
 
 __all__ = [
     "RAGQuestionAnsweringAgentInputSchema",
@@ -23,4 +28,7 @@ __all__ = [
     "TaskingInputSchema",
     "TaskingOutputSchema",
     "tasking_agent",
+    "OrchestratorInputSchema",
+    "OrchestratorOutputSchema",
+    "orchestrator_agent",
 ]

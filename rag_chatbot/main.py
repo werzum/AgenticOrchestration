@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from rag_chatbot.agents import SpeechToTextAgent, stt_config
-from rag_chatbot.app import chat_loop, initialize_system, transcription_loop
+from rag_chatbot.app import OrchestrationEnvironment, chat_loop, initialize_system, transcription_loop
 from rag_chatbot.config import DEFAULT_DOCUMENT_PATH
 
 
@@ -31,8 +31,8 @@ def main() -> None:
     args = parse_args()
 
     if args.mode == "chat":
-        chroma_db, rag_context = initialize_system(str(args.documents))
-        chat_loop(chroma_db, rag_context)
+        environment: OrchestrationEnvironment = initialize_system(str(args.documents))
+        chat_loop(environment)
     else:
         stt_agent = SpeechToTextAgent(config=stt_config)
         transcription_loop(stt_agent)
