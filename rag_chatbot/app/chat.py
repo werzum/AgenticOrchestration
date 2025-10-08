@@ -62,7 +62,7 @@ def initialize_system(document_path: str) -> OrchestrationEnvironment:
     chroma_db = ChromaDBService(
         collection_name="knowledge_base",
         persist_directory=CHROMA_PERSIST_DIR,
-        recreate_collection=False,
+        recreate_collection=True,
     )
 
     chroma_db.add_markdown_files_to_collection(document_path)

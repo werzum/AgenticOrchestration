@@ -40,6 +40,7 @@ query_agent = BaseAgent(
                 "3. Ensure the query captures the core meaning while being general enough to match similar content",
             ],
             output_instructions=[
+                "Always include the keywords of the original query"
                 "Generate a clear, concise semantic search query",
                 "Focus on key concepts and entities from the user's question",
                 "Avoid overly specific details that might miss relevant matches",

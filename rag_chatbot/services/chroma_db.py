@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, Iterable, List, Optional, TypedDict
 from uuid import uuid4
 
 import chromadb
 from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
+from rag_chatbot.config import CHUNK_OVERLAP, CHUNK_SIZE
 
 
 class QueryResult(TypedDict):
@@ -82,6 +84,35 @@ class ChromaDBService:
     def delete_by_ids(self, ids: List[str]) -> None:
         self.collection.delete(ids=ids)
 
+    def _chunk_text(
+        self,
+        text: str,
+        *,
+        chunk_size: int = CHUNK_SIZE,
+        chunk_overlap: int = CHUNK_OVERLAP,
+    ) -> Iterable[str]:
+        if not text:
+            return []
+
+        normalized_chunk_size = max(1, chunk_size)
+        normalized_overlap = max(0, min(chunk_overlap, normalized_chunk_size - 1))
+        step = normalized_chunk_size - normalized_overlap
+        if step <= 0:
+            step = normalized_chunk_size
+
+        chunks: List[str] = []
+        start = 0
+        text_length = len(text)
+
+        while start < text_length:
+            end = min(start + normalized_chunk_size, text_length)
+            chunk = text[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            start += step
+
+        return chunks
+
     def add_markdown_files_to_collection(self, folder_path: str | Path) -> List[str]:
         folder = Path(folder_path)
         documents: List[str] = []
@@ -90,9 +121,13 @@ class ChromaDBService:
 
         for file_path in folder.rglob("*.md"):
             file_content = file_path.read_text(encoding="utf-8")
-            documents.append(file_content)
-            metadatas.append({"source": str(file_path)})
-            ids.append(str(uuid4()))
+            for chunk_idx, chunk in enumerate(self._chunk_text(file_content), start=1):
+                documents.append(chunk)
+                metadatas.append({
+                    "source": str(file_path),
+                    "chunk_index": chunk_idx,
+                })
+                ids.append(str(uuid4()))
 
         if not documents:
             return []
