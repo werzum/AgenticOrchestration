@@ -1,0 +1,100 @@
+"""ChromaDB service abstractions used across the application."""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from typing import Dict, List, Optional, TypedDict
+from uuid import uuid4
+
+import chromadb
+from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
+
+class QueryResult(TypedDict):
+    documents: List[str]
+    metadatas: List[Dict[str, str]]
+    distances: List[float]
+    ids: List[str]
+
+
+class ChromaDBService:
+    """Service for interacting with ChromaDB using Ollama embeddings."""
+
+    def __init__(
+        self,
+        collection_name: str,
+        persist_directory: str | Path = "./chroma_db",
+        recreate_collection: bool = False,
+    ) -> None:
+        persist_path = Path(persist_directory)
+        self.embedding_function = OllamaEmbeddingFunction(timeout=30)
+
+        if recreate_collection and persist_path.exists():
+            shutil.rmtree(persist_path)
+        persist_path.mkdir(parents=True, exist_ok=True)
+
+        self.client = chromadb.PersistentClient(path=str(persist_path))
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=self.embedding_function,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+    def add_documents(
+        self,
+        documents: List[str],
+        metadatas: Optional[List[Dict[str, str]]] = None,
+        ids: Optional[List[str]] = None,
+    ) -> List[str]:
+        if ids is None:
+            ids = [str(uuid4()) for _ in documents]
+
+        self.collection.add(documents=documents, metadatas=metadatas, ids=ids)
+        return ids
+
+    def query(
+        self,
+        query_text: str,
+        n_results: int = 5,
+        where: Optional[Dict[str, str]] = None,
+    ) -> QueryResult:
+        results = self.collection.query(
+            query_texts=[query_text],
+            n_results=max(1, min(n_results, self.get_count())),
+            where=where,
+            include=["documents", "metadatas", "distances"],
+        )
+        return {
+            "documents": results["documents"][0],
+            "metadatas": results["metadatas"][0],
+            "distances": results["distances"][0],
+            "ids": results["ids"][0],
+        }
+
+    def delete_collection(self, collection_name: Optional[str] = None) -> None:
+        name_to_delete = collection_name if collection_name is not None else self.collection.name
+        self.client.delete_collection(name=name_to_delete)
+
+    def get_count(self) -> int:
+        return self.collection.count()
+
+    def delete_by_ids(self, ids: List[str]) -> None:
+        self.collection.delete(ids=ids)
+
+    def add_markdown_files_to_collection(self, folder_path: str | Path) -> List[str]:
+        folder = Path(folder_path)
+        documents: List[str] = []
+        metadatas: List[Dict[str, str]] = []
+        ids: List[str] = []
+
+        for file_path in folder.rglob("*.md"):
+            file_content = file_path.read_text(encoding="utf-8")
+            documents.append(file_content)
+            metadatas.append({"source": str(file_path)})
+            ids.append(str(uuid4()))
+
+        if not documents:
+            return []
+
+        return self.add_documents(documents=documents, metadatas=metadatas, ids=ids)
